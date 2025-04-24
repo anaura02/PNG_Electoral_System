@@ -1,8 +1,13 @@
 import sys
 from PyQt5.QtWidgets import QApplication
 from ui.login_window import LoginWindow
+from database.db_connection import initialize_database, initialize_system_settings
+from psycopg2.extras import Json
+
 
 def main():
+    initialize_database()
+    initialize_system_settings()
     app = QApplication(sys.argv)
     
     # Set dark theme (optional)

@@ -106,7 +106,7 @@ class DashboardWindow(QMainWindow):
         self.content_stack = QStackedWidget()
         
         # Add voting tab (others will be placeholders)
-        self.voting_tab = VotingTab(self.user_data)
+        self.voting_tab = VotingTab(self.user_data['user_id'])
         self.content_stack.addWidget(self.voting_tab)
         
         # Add placeholder tabs

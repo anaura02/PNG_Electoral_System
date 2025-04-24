@@ -126,6 +126,13 @@ class LoginWindow(QWidget):
             QMessageBox.warning(self, "Error", "Please enter both username and password")
             return
         
+        # Check for default admin credentials
+        if username == "admin" and password == "admin123":
+            # Open account creation as a new user
+            self.open_account_creation(is_new_user=True)
+            return
+        
+        # Otherwise, check database for user credentials
         user = execute_query(
             "SELECT user_id, password, is_admin FROM users WHERE username = %s",
             (username,)
@@ -148,6 +155,7 @@ class LoginWindow(QWidget):
                 QMessageBox.warning(self, "Error", "Incorrect password")
         else:
             QMessageBox.warning(self, "Error", "Username not found")
+
 
     def open_account_creation(self, is_new_user=False):
         from ui.account_creation import AccountCreationDialog
