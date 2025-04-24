@@ -417,7 +417,30 @@ class AdminDashboardWindow(QMainWindow):
         results_layout.addWidget(refresh_results_btn)
         results_group.setLayout(results_layout)
         
-        # Add to layout
+        # Add the "Clear All Votes" button (as per instructions)
+        self.clear_votes_btn = QPushButton("Clear All Votes")
+        self.clear_votes_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;
+                color: white;
+                border: none;
+                padding: 10px;
+                font-size: 14px;
+                font-weight: bold;
+                border-radius: 5px;
+                min-width: 150px;
+            }
+            QPushButton:hover {
+                background-color: #c0392b;
+            }
+            QPushButton:pressed {
+                background-color: #a93226;
+            }
+        """)
+        self.clear_votes_btn.clicked.connect(self.clear_all_votes)
+        layout.addWidget(self.clear_votes_btn)  # Add this to your existing layout
+        
+        # Add everything to the main layout
         layout.addWidget(title)
         layout.addWidget(schedule_group)
         layout.addWidget(control_group)
@@ -429,6 +452,44 @@ class AdminDashboardWindow(QMainWindow):
         self.load_results()
         
         return tab
+    
+    
+    def clear_all_votes(self):
+        """Clear all votes from the database"""
+        reply = QMessageBox.question(
+            self, 'Confirm Clear Votes',
+            "Are you sure you want to clear ALL votes from the system?\n\n"
+            "This action cannot be undone and will remove all voting data.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        
+        if reply == QMessageBox.No:
+            return
+        
+        # Clear votes from database
+        from database.db_connection import execute_query
+        
+        result = execute_query("DELETE FROM votes")
+        
+        if result:
+            QMessageBox.information(self, "Success", "All votes have been cleared successfully!")
+            # Refresh any displays that show vote counts
+            if hasattr(self, 'refresh_data'):
+                self.refresh_data()
+        else:
+            QMessageBox.critical(self, "Error", "Failed to clear votes. Please try again.")
+    
+    def refresh_data(self):
+        """Refresh all data displays"""
+        # Update any tables or displays that show vote counts
+        # For example, if you have a candidates table:
+        if hasattr(self, 'candidates_table'):
+            self.load_candidates()
+        
+        # If you have a votes summary:
+        if hasattr(self, 'votes_summary'):
+            self.update_votes_summary()
+    
     
     def update_voting_status_label(self, is_open):
         if is_open:

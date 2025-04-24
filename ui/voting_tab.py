@@ -127,31 +127,15 @@ class VotingTab(QWidget):
         grid_container.setLayout(self.grid_layout)
         scroll.setWidget(grid_container)
         
-        # Selection display
-        selection_frame = QFrame()
-        selection_frame.setStyleSheet("""
-            QFrame {
-                background-color: #f8f9fa;
-                border-radius: 5px;
-                padding: 10px;
-            }
-        """)
-        selection_layout = QVBoxLayout()
-        
-        # Add these to your setup_ui method
+        # Create hidden labels for tracking selections (we'll keep these for internal use)
         self.first_pref_label = QLabel("1st Preference: Not selected")
-        self.first_pref_label.setStyleSheet("color: #7f8c8d;")
+        self.first_pref_label.setVisible(False)
         self.second_pref_label = QLabel("2nd Preference: Not selected")
-        self.second_pref_label.setStyleSheet("color: #7f8c8d;")
+        self.second_pref_label.setVisible(False)
         self.third_pref_label = QLabel("3rd Preference: Not selected")
-        self.third_pref_label.setStyleSheet("color: #7f8c8d;")
+        self.third_pref_label.setVisible(False)
         
-        selection_layout.addWidget(self.first_pref_label)
-        selection_layout.addWidget(self.second_pref_label)
-        selection_layout.addWidget(self.third_pref_label)
-        selection_frame.setLayout(selection_layout)
-        
-        # Submit button
+        # Submit button - ALWAYS ENABLED
         self.submit_btn = QPushButton("Submit Vote")
         self.submit_btn.setStyleSheet("""
             QPushButton {
@@ -170,12 +154,13 @@ class VotingTab(QWidget):
             QPushButton:pressed {
                 background-color: #1a6ca8;
             }
-            QPushButton:disabled {
-                background-color: #95a5a6;
-            }
         """)
-        self.submit_btn.setEnabled(False)  # Disabled until all preferences selected
+        # Always enable the button
+        self.submit_btn.setEnabled(True)
+        
+        # Connect with direct method reference
         self.submit_btn.clicked.connect(self.submit_vote)
+        print("Submit button connected to submit_vote method")  # Debug
         
         # Leaderboard section
         leaderboard_frame = QFrame()
@@ -243,14 +228,14 @@ class VotingTab(QWidget):
         main_layout.addWidget(title)
         main_layout.addWidget(instructions)
         main_layout.addWidget(scroll)
-        main_layout.addWidget(selection_frame)
         main_layout.addWidget(self.submit_btn, alignment=Qt.AlignCenter)
         main_layout.addWidget(leaderboard_frame)
         self.setLayout(main_layout)
         
         # Initialize leaderboard
         self.update_leaderboard()
-       
+
+
     def create_candidate_card(self, candidate):
         card = QFrame()
         card.setStyleSheet("""
@@ -299,27 +284,9 @@ class VotingTab(QWidget):
         party.setAlignment(Qt.AlignCenter)
         
         # Preferences selection
-        pref_group = QButtonGroup()
         pref1 = QRadioButton("1st Preference")
         pref2 = QRadioButton("2nd Preference")
         pref3 = QRadioButton("3rd Preference")
-        
-        # Add to button group
-        pref_group.addButton(pref1, 1)
-        pref_group.addButton(pref2, 2)
-        pref_group.addButton(pref3, 3)
-        
-        # Connect button group to handler
-        pref_group.buttonClicked.connect(
-            lambda button: self.handle_candidate_selection(candidate['id'], pref_group.id(button))
-        )
-        
-        # Store selections in dictionary
-        self.preference_groups[candidate['id']] = {
-            1: pref1,
-            2: pref2,
-            3: pref3
-        }
         
         # Style radio buttons
         radio_style = """
@@ -335,6 +302,14 @@ class VotingTab(QWidget):
         for rb in [pref1, pref2, pref3]:
             rb.setStyleSheet(radio_style)
         
+        # Connect each radio button directly
+        candidate_id = candidate['id']
+        
+        # Direct connections for each preference
+        pref1.clicked.connect(lambda: self.set_preference(candidate_id, 1))
+        pref2.clicked.connect(lambda: self.set_preference(candidate_id, 2))
+        pref3.clicked.connect(lambda: self.set_preference(candidate_id, 3))
+        
         # Add to layout
         layout.addWidget(photo, alignment=Qt.AlignCenter)
         layout.addWidget(name)
@@ -348,6 +323,24 @@ class VotingTab(QWidget):
         card.setLayout(layout)
         return card
     
+    def set_preference(self, candidate_id, preference):
+        """Set a preference for a candidate"""
+        print(f"Setting preference: candidate={candidate_id}, preference={preference}")  # Debug
+        
+        # Update the appropriate choice attribute based on preference
+        if preference == 1:
+            self.first_choice = candidate_id
+        elif preference == 2:
+            self.second_choice = candidate_id
+        elif preference == 3:
+            self.third_choice = candidate_id
+        
+        # Debug - print current selections
+        print(f"Current selections: 1st={self.first_choice}, 2nd={self.second_choice}, 3rd={self.third_choice}")
+
+       
+    
+    
     def set_default_photo(self, photo_label):
         """Set default user icon when no photo available"""
         default_icon = QIcon.fromTheme("user")
@@ -356,24 +349,39 @@ class VotingTab(QWidget):
             photo_label.setStyleSheet("color: #7f8c8d; font-style: italic;")
         else:
             photo_label.setPixmap(default_icon.pixmap(150, 150))
-
+            
+    
     def submit_vote(self):
         """Submit the user's vote"""
         print("Submit vote button clicked")  # Debug message
         
-        # Check if all preferences are selected
-        if not all([self.first_choice, self.second_choice, self.third_choice]):
-            QMessageBox.warning(self, "Incomplete Selection",
-                            "Please select all three preferences before submitting.")
+        # Get the selected preferences (could be None)
+        selected_candidates = [self.first_choice, self.second_choice, self.third_choice]
+        print(f"Selected candidates: {selected_candidates}")
+        
+        # Filter out None values
+        valid_selections = [c for c in selected_candidates if c is not None]
+        print(f"Valid selections: {valid_selections}")
+        
+        # Check if any preferences are selected
+        if not valid_selections:
+            QMessageBox.warning(self, "No Selection",
+                            "Please select at least one preference before submitting.")
             return
         
         # Confirm vote
+        preferences_text = ""
+        if self.first_choice:
+            preferences_text += f"1st Preference: {self.get_candidate_name(self.first_choice)}\n"
+        if self.second_choice:
+            preferences_text += f"2nd Preference: {self.get_candidate_name(self.second_choice)}\n"
+        if self.third_choice:
+            preferences_text += f"3rd Preference: {self.get_candidate_name(self.third_choice)}\n"
+        
         reply = QMessageBox.question(
             self, 'Confirm Vote',
-            "Are you sure you want to submit your vote with the following preferences?\n\n"
-            f"1st Preference: {self.get_candidate_name(self.first_choice)}\n"
-                        f"2nd Preference: {self.get_candidate_name(self.second_choice)}\n"
-            f"3rd Preference: {self.get_candidate_name(self.third_choice)}\n\n"
+            f"Are you sure you want to submit your vote with the following preferences?\n\n"
+            f"{preferences_text}\n"
             "This action cannot be undone.",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
@@ -382,13 +390,20 @@ class VotingTab(QWidget):
             return
         
         # Submit vote to database
-        from database.db_connection import create_connection  # Import the correct function
+        from database.db_connection import create_connection
         
         conn = None
         cursor = None
         try:
-            conn = create_connection()  # Use create_connection instead of get_connection
+            print("Attempting to connect to database...")  # Debug
+            conn = create_connection()
+            if not conn:
+                print("Failed to create database connection")  # Debug
+                QMessageBox.critical(self, "Error", "Failed to connect to database")
+                return
+                
             cursor = conn.cursor()
+            print("Database connection established")  # Debug
             
             # Check if user has already voted
             cursor.execute(
@@ -396,26 +411,33 @@ class VotingTab(QWidget):
                 (self.user_id,)
             )
             vote_count = cursor.fetchone()[0]
+            print(f"User has {vote_count} existing votes")  # Debug
             
             if vote_count > 0:
                 QMessageBox.warning(self, "Already Voted",
-                                 "You have already submitted your vote.")
+                                "You have already submitted your vote.")
                 return
             
-            # Insert votes for each preference
-            for preference, candidate_id in enumerate([self.first_choice, self.second_choice, self.third_choice], 1):
+            # Insert votes for each valid preference
+            for preference, candidate_id in enumerate([c for c in selected_candidates if c is not None], 1):
+                print(f"Inserting vote: user_id={self.user_id}, candidate_id={candidate_id}, preference={preference}")  # Debug
                 cursor.execute(
                     "INSERT INTO votes (user_id, candidate_id, preference) VALUES (%s, %s, %s)",
                     (self.user_id, candidate_id, preference)
                 )
             
             conn.commit()
+            print("Votes committed to database")  # Debug
             QMessageBox.information(self, "Success", "Your vote has been recorded successfully!")
             
             # Disable voting controls
             self.disable_voting_controls()
             
+            # Update leaderboard
+            self.update_leaderboard()
+            
         except Exception as e:
+            print(f"Error submitting vote: {e}")  # Debug
             QMessageBox.critical(self, "Error", f"Failed to submit vote: {str(e)}")
             if conn:
                 try:
@@ -432,7 +454,9 @@ class VotingTab(QWidget):
                 try:
                     conn.close()
                 except:
-                    pass
+                    pass           
+
+    
         
     def get_candidate_name(self, candidate_id):
         """Get candidate name from ID"""
@@ -533,8 +557,11 @@ class VotingTab(QWidget):
         else:
             self.winner_label.setVisible(False)
        
+    
     def handle_candidate_selection(self, candidate_id, preference):
         """Handle when a candidate is selected for a preference"""
+        print(f"Selection made: Candidate {candidate_id} for preference {preference}")  # Debug
+        
         # Update the appropriate choice attribute based on preference
         if preference == 1:
             self.first_choice = candidate_id
@@ -543,8 +570,9 @@ class VotingTab(QWidget):
         elif preference == 3:
             self.third_choice = candidate_id
         
-        # Update UI to show selection
-        self.update_selection_display()
+        # Debug - print current selections
+        print(f"Current selections: 1st={self.first_choice}, 2nd={self.second_choice}, 3rd={self.third_choice}")
+
      
     def update_selection_display(self):
         """Update the display to show current selections"""
@@ -576,9 +604,12 @@ class VotingTab(QWidget):
             self.third_pref_label.setStyleSheet("color: #7f8c8d;")
         
         # Enable submit button if all preferences are selected
-        if all([self.first_choice, self.second_choice, self.third_choice]):
+        if self.first_choice and self.second_choice and self.third_choice:
+            print("All preferences selected, enabling submit button")  # Debug
             self.submit_btn.setEnabled(True)
         else:
+            print(f"Not all preferences selected: 1st={bool(self.first_choice)}, 2nd={bool(self.second_choice)}, 3rd={bool(self.third_choice)}")  # Debug
             self.submit_btn.setEnabled(False)
 
-            
+
+                
