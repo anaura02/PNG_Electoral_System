@@ -467,12 +467,21 @@ class AdminDashboardWindow(QMainWindow):
             return
         
         # Clear votes from database
-        from database.db_connection import execute_query
+        from database.db_connection import execute_query, log_audit
         
         result = execute_query("DELETE FROM votes")
         
         if result:
+            # Log the audit event
+            log_audit(
+                self.user_id,  # You'll need to pass user_id to AdminTab
+                "VOTES_CLEARED",
+                "Admin cleared all votes from the system",
+                None
+            )
             QMessageBox.information(self, "Success", "All votes have been cleared successfully!")
+            
+            
             # Refresh any displays that show vote counts
             if hasattr(self, 'refresh_data'):
                 self.refresh_data()

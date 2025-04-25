@@ -144,6 +144,16 @@ def initialize_database():
             value TEXT NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS audit_log (
+            log_id SERIAL PRIMARY KEY,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            user_id INTEGER REFERENCES users(user_id),
+            action VARCHAR(255) NOT NULL,
+            details TEXT,
+            ip_address VARCHAR(45)
+        )
         """
     ]
     
@@ -174,6 +184,7 @@ def initialize_database():
             cursor.close()
         if conn:
             conn.close()
+
 
 def initialize_system_settings():
     """Initialize system settings if they don't exist"""
@@ -223,3 +234,12 @@ def initialize_system_settings():
             cursor.close()
         if conn:
             conn.close()
+
+def log_audit(user_id, action, details=None, ip_address=None):
+    """Log an action to the audit log"""
+    query = """
+    INSERT INTO audit_log (user_id, action, details, ip_address)
+    VALUES (%s, %s, %s, %s)
+    """
+    # Call execute_query with only the parameters it accepts
+    execute_query(query, (user_id, action, details, ip_address))

@@ -416,7 +416,7 @@ class VotingTab(QWidget):
             return
         
         # Submit vote to database
-        from database.db_connection import create_connection
+        from database.db_connection import create_connection, log_audit
         
         conn = None
         cursor = None
@@ -444,17 +444,35 @@ class VotingTab(QWidget):
                                 "You have already submitted your vote.")
                 return
             
-            # Insert votes for each valid preference
-            for preference, candidate_id in enumerate([c for c in selected_candidates if c is not None], 1):
-                print(f"Inserting vote: user_id={self.user_id}, candidate_id={candidate_id}, preference={preference}")  # Debug
-                cursor.execute(
-                    "INSERT INTO votes (user_id, candidate_id, preference) VALUES (%s, %s, %s)",
-                    (self.user_id, candidate_id, preference)
-                )
+            # Insert votes for each preference
+            for preference, candidate_id in enumerate([self.first_choice, self.second_choice, self.third_choice], 1):
+                if candidate_id:  # Only insert if a preference was selected
+                    cursor.execute(
+                        "INSERT INTO votes (user_id, candidate_id, preference) VALUES (%s, %s, %s)",
+                        (self.user_id, candidate_id, preference)
+                    )
             
             conn.commit()
-            print("Votes committed to database")  # Debug
+            
+            
+            # Log the audit event
+            preferences_text = ""
+            if self.first_choice:
+                preferences_text += f"1st: {self.get_candidate_name(self.first_choice)}, "
+            if self.second_choice:
+                preferences_text += f"2nd: {self.get_candidate_name(self.second_choice)}, "
+            if self.third_choice:
+                preferences_text += f"3rd: {self.get_candidate_name(self.third_choice)}"
+                
+            log_audit(
+                self.user_id,
+                "VOTE_SUBMITTED",
+                f"User submitted vote with preferences: {preferences_text.strip(', ')}",
+                None  # IP address could be added if available
+            )
+            
             QMessageBox.information(self, "Success", "Your vote has been recorded successfully!")
+            
             
             # Disable voting controls
             self.disable_voting_controls()
