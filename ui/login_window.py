@@ -168,20 +168,26 @@ class LoginWindow(QWidget):
         self.admin_dashboard.show()
         self.close()
 
-    def open_dashboard(self, user_id):        
+    def open_dashboard(self, user_id):
+        """Open the dashboard window with user data"""
+        # Get user data from database - remove 'role' column
         user_data = execute_query(
-        "SELECT full_name, province, district FROM users WHERE user_id = %s",
-        (user_id,)
-        )[0]
-    
-        dashboard_data = {
-            'user_id': user_id,  # THIS WAS MISSING - CAUSED THE ERROR
-            'full_name': user_data[0],
-            'province': user_data[1],
-            'district': user_data[2]
-        }
+            "SELECT user_id, username, full_name, district FROM users WHERE user_id = %s",
+            (user_id,)
+        )
         
-        from ui.dashboard import DashboardWindow
-        self.dashboard = DashboardWindow(dashboard_data)
-        self.dashboard.show()
-        self.close()
+        if user_data and len(user_data) > 0:
+            # Create a dictionary with user data
+            dashboard_data = {
+                'user_id': user_data[0][0],
+                'username': user_data[0][1],
+                'full_name': user_data[0][2],
+                'district': user_data[0][3]
+            }
+            
+            # Open dashboard window
+            self.dashboard = DashboardWindow(dashboard_data)
+            self.dashboard.show()
+            self.close()
+        else:
+            QMessageBox.critical(self, "Error", "Failed to retrieve user data.")
