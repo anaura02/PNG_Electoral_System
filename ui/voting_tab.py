@@ -172,37 +172,61 @@ class VotingTab(QWidget):
                 padding: 15px;
             }
         """)
-        
+
         leaderboard_layout = QVBoxLayout()
         
         # Leaderboard title
         leaderboard_title = QLabel("Current Leaderboard")
         leaderboard_title.setFont(QFont('Segoe UI', 16, QFont.Bold))
         leaderboard_title.setStyleSheet("color: #2c3e50; margin-bottom: 10px;")
+
+        # Explanation text
+        explanation = QLabel("The candidate with the most 1st preference votes wins the election.")
+        explanation.setFont(QFont('Segoe UI', 10))
+        explanation.setStyleSheet("color: #7f8c8d; margin-bottom: 15px;")
         
-        # Leaderboard table
+        # Leaderboard table with custom header
         self.leaderboard_table = QTableWidget()
         self.leaderboard_table.setColumnCount(4)
-        self.leaderboard_table.setHorizontalHeaderLabels([
-            "Candidate", "Party", "First Preference Votes", "Total Points"
-        ])
         self.leaderboard_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.leaderboard_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.leaderboard_table.verticalHeader().setVisible(False)
-        self.leaderboard_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.leaderboard_table.horizontalHeader().setVisible(False)  # Hide the default header
+
+        # Create a custom header row
+        self.leaderboard_table.setRowCount(1)  # Add an extra row for headers
+        header_labels = ["Candidate Name", "Party", "1st Preference", "Total Votes"]
+
+        for col, label in enumerate(header_labels):
+            header_item = QTableWidgetItem(label)
+            header_item.setBackground(QColor("#2c3e50"))
+            header_item.setForeground(QColor("white"))
+            font = header_item.font()
+            font.setBold(True)
+            header_item.setFont(font)
+            header_item.setTextAlignment(Qt.AlignCenter)
+            self.leaderboard_table.setItem(0, col, header_item)
+
+        # Set column widths
+        self.leaderboard_table.setColumnWidth(0, 200)
+        self.leaderboard_table.setColumnWidth(1, 150)
+        self.leaderboard_table.setColumnWidth(2, 150)
+        self.leaderboard_table.setColumnWidth(3, 150)
+
+        # Set minimum size for the table
+        self.leaderboard_table.setMinimumHeight(250)
+        self.leaderboard_table.setMinimumWidth(650)
+
         self.leaderboard_table.setStyleSheet("""
             QTableWidget {
                 border: none;
                 background-color: white;
             }
-            QHeaderView::section {
-                background-color: #2c3e50;
-                color: white;
-                padding: 8px;
-                border: none;
+            QTableWidget::item {
+                padding: 5px;
             }
         """)
-        
+
         # Winner declaration (initially hidden)
         self.winner_label = QLabel()
         self.winner_label.setFont(QFont('Segoe UI', 14, QFont.Bold))
@@ -220,6 +244,7 @@ class VotingTab(QWidget):
         
         # Add to leaderboard layout
         leaderboard_layout.addWidget(leaderboard_title)
+        leaderboard_layout.addWidget(explanation)
         leaderboard_layout.addWidget(self.leaderboard_table)
         leaderboard_layout.addWidget(self.winner_label)
         leaderboard_frame.setLayout(leaderboard_layout)
@@ -234,6 +259,7 @@ class VotingTab(QWidget):
         
         # Initialize leaderboard
         self.update_leaderboard()
+
 
 
     def create_candidate_card(self, candidate):
@@ -506,35 +532,37 @@ class VotingTab(QWidget):
         results = execute_query(
             """SELECT c.name, c.party,
                 SUM(CASE WHEN v.preference = 1 THEN 1 ELSE 0 END) as first_prefs,
-                SUM(CASE WHEN v.preference = 1 THEN 3
-                          WHEN v.preference = 2 THEN 2
-                         WHEN v.preference = 3 THEN 1 ELSE 0 END) as total_points
+                COUNT(v.vote_id) as total_votes
             FROM candidates c
             LEFT JOIN votes v ON c.candidate_id = v.candidate_id
             WHERE c.district = %s
             GROUP BY c.candidate_id, c.name, c.party
-            ORDER BY total_points DESC, first_prefs DESC""",
+            ORDER BY first_prefs DESC, total_votes DESC""",
             (self.user_data['district'],)
         )
         
-        # Update table
+        # Update table - account for header row
         if results:
-            self.leaderboard_table.setRowCount(len(results))
+            # Set row count (add 1 for the header row)
+            self.leaderboard_table.setRowCount(len(results) + 1)
             
-            for row, (name, party, first_prefs, total_points) in enumerate(results):
+            for row, (name, party, first_prefs, total_votes) in enumerate(results):
+                # Adjust row index to account for header row
+                table_row = row + 1
+                
                 # Set values
                 name_item = QTableWidgetItem(name)
                 party_item = QTableWidgetItem(party)
                 first_prefs_item = QTableWidgetItem(str(first_prefs or 0))
-                total_points_item = QTableWidgetItem(str(total_points or 0))
+                total_votes_item = QTableWidgetItem(str(total_votes or 0))
                 
                 # Center align
-                for item in [name_item, party_item, first_prefs_item, total_points_item]:
+                for item in [name_item, party_item, first_prefs_item, total_votes_item]:
                     item.setTextAlignment(Qt.AlignCenter)
                 
                 # Highlight winner row if voting is closed
                 if is_closed and row == 0:
-                    for item in [name_item, party_item, first_prefs_item, total_points_item]:
+                    for item in [name_item, party_item, first_prefs_item, total_votes_item]:
                         item.setBackground(QColor("#e8f8f5"))
                         item.setForeground(QColor("#27ae60"))
                         font = item.font()
@@ -542,12 +570,13 @@ class VotingTab(QWidget):
                         item.setFont(font)
                 
                 # Add to table
-                self.leaderboard_table.setItem(row, 0, name_item)
-                self.leaderboard_table.setItem(row, 1, party_item)
-                self.leaderboard_table.setItem(row, 2, first_prefs_item)
-                self.leaderboard_table.setItem(row, 3, total_points_item)
+                self.leaderboard_table.setItem(table_row, 0, name_item)
+                self.leaderboard_table.setItem(table_row, 1, party_item)
+                self.leaderboard_table.setItem(table_row, 2, first_prefs_item)
+                self.leaderboard_table.setItem(table_row, 3, total_votes_item)
         else:
-            self.leaderboard_table.setRowCount(0)
+            # Just keep the header row
+            self.leaderboard_table.setRowCount(1)
         
         # Show winner if voting is closed
         if is_closed and results and len(results) > 0:
@@ -556,6 +585,8 @@ class VotingTab(QWidget):
             self.winner_label.setVisible(True)
         else:
             self.winner_label.setVisible(False)
+
+
        
     
     def handle_candidate_selection(self, candidate_id, preference):
