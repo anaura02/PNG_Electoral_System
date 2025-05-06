@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QSize, QDateTime, QBuffer
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QColor, QImage
 from database.db_connection import execute_query, create_connection
+from ui.reports_tab import ReportsTab
 import os
 import base64
 
@@ -39,21 +40,19 @@ districts_by_province = {
 class AdminDashboardWindow(QMainWindow):
     def __init__(self, user_id):
         super().__init__()
-        self.user_id = user_id
-        
-        # Get admin name from database
-        admin_data = execute_query(
-            "SELECT full_name FROM users WHERE user_id = %s",
-            (user_id,)
-        )
-        
+    
+        # Get admin data
+        admin_data = execute_query("SELECT * FROM users WHERE user_id = %s", (user_id,))
         if admin_data:
-            self.admin_name = admin_data[0][0]
-        else:
-            self.admin_name = "Administrator"
+            self.admin_name = admin_data[0][2]  # Assuming full_name is at index 2
+            self.user_id = user_id
+            self.user_data = {
+                'user_id': user_id,
+                'full_name': self.admin_name,
+                'is_admin': True
+            }
         
         self.setup_ui()
-        self.show()
     
     def setup_ui(self):
         self.setWindowTitle("Electoral System - Admin Dashboard")
@@ -132,12 +131,10 @@ class AdminDashboardWindow(QMainWindow):
         candidate_layout.setContentsMargins(20, 20, 20, 20)
         candidate_layout.setSpacing(20)
         
-        # Title
         candidates_title = QLabel("Candidate Management")
         candidates_title.setFont(QFont('Segoe UI', 18, QFont.Bold))
         candidates_title.setStyleSheet("color: #2c3e50;")
         
-        # Action buttons
         btn_container = QWidget()
         btn_layout = QHBoxLayout()
         btn_layout.setContentsMargins(0, 0, 0, 0)
@@ -158,7 +155,6 @@ class AdminDashboardWindow(QMainWindow):
         btn_layout.addStretch()
         btn_container.setLayout(btn_layout)
         
-        # Candidates table
         self.candidates_table = QTableWidget()
         self.candidates_table.setColumnCount(7)
         self.candidates_table.setHorizontalHeaderLabels([
@@ -184,7 +180,6 @@ class AdminDashboardWindow(QMainWindow):
             }
         """)
         
-        # Add to candidate tab layout
         candidate_layout.addWidget(candidates_title)
         candidate_layout.addWidget(btn_container)
         candidate_layout.addWidget(self.candidates_table)
@@ -193,9 +188,13 @@ class AdminDashboardWindow(QMainWindow):
         # Voting control tab
         voting_control_tab = self.setup_voting_control()
         
+        # ✅ Reports tab - INSERTED HERE
+        self.reports_tab = ReportsTab(self.user_data)
+        
         # Add tabs to tab widget
         tab_widget.addTab(candidate_tab, "Candidate Management")
         tab_widget.addTab(voting_control_tab, "Voting Control")
+        tab_widget.addTab(self.reports_tab, "Reports")  # Add Reports tab here
         
         # Add components to main layout
         main_layout.addWidget(header)
@@ -208,6 +207,7 @@ class AdminDashboardWindow(QMainWindow):
         
         # Load candidates
         self.load_candidates()
+
     
     def setup_voting_control(self):
         tab = QWidget()
